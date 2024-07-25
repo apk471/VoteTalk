@@ -1,7 +1,7 @@
 "use client"
 
 import MaxWidthWrapper from "@/components/MaxWidthWrapper";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { Wordcloud } from "@visx/wordcloud"
 import { scaleLog } from "@visx/scale";
 import { Text } from "@visx/text";
@@ -27,6 +27,30 @@ const ClientPage = ({topicName , initialData} : ClientPageProps) => {
     useEffect(() => {
         socket.emit("join-room" , `room:${topicName}`);
     }, []);
+
+    useEffect(() => {
+        socket.on("room-update", (message : string) => {
+            const data = JSON.parse(message) as {text: string; value: number}[];
+            data.map((newWord) => {
+                const isWordAlreadyIncluded = words.some((word) => word.text === newWord.text);
+
+                if(isWordAlreadyIncluded){
+                    setWords((prev) => {
+                        const before = prev.find((word) => word.text === newWord.text);
+                        const rest = prev.filter((word) => word.text !== newWord.text);
+
+                        return [...rest, {text: before!.text, value: before!.value + newWord.value}];
+                    })
+                } else if(words.length < 50) {
+                    setWords((prev) => [...prev, newWord]);
+                }
+            });
+        });
+
+        return () => {
+            socket.off("room-update");
+        }
+    }, [words]);
 
     const fontScale = scaleLog({
         domain: [Math.min(...words.map((d) => d.value)), Math.max(...words.map((d) => d.value))],
